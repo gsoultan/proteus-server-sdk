@@ -1,0 +1,19 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/gsoultan/proteus-server-sdk/go/gen
+plugins:
+  - local: protoc-gen-go
+    out: go/gen
+    opt: paths=source_relative
+  - local: protoc-gen-connect-go
+    out: go/gen
+    opt: paths=source_relative
+  - local: ts/node_modules/.bin/protoc-gen-es
+    out: ts/src/gen
+    opt:
+      - target=ts
+      - import_extension=js
