@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Gembit Soultan Shirazi <gembit.soultan@gmail.com>
 
 // Package proteus is the Go client for proteus-server. It wraps the generated
-// Connect clients for the conversion and template services with the API key
+// Connect clients for the conversion, template and PDF services with the API key
 // header, and decodes the template data errors the server attaches.
 //
 //	c := proteus.New("https://proteus.example.com", apiKey)
@@ -29,6 +29,8 @@ import (
 type Client struct {
 	Conversion proteusv1connect.ConversionServiceClient
 	Templates  proteusv1connect.TemplateServiceClient
+	// Pdf merges and splits existing PDF files.
+	Pdf proteusv1connect.PdfServiceClient
 }
 
 type options struct {
@@ -77,6 +79,7 @@ func New(baseURL, apiKey string, opts ...Option) *Client {
 	return &Client{
 		Conversion: proteusv1connect.NewConversionServiceClient(c),
 		Templates:  proteusv1connect.NewTemplateServiceClient(c),
+		Pdf:        proteusv1connect.NewPdfServiceClient(c),
 	}
 }
 

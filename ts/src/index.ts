@@ -6,6 +6,7 @@
  * ```ts
  * const proteus = createProteus({ baseUrl: "https://proteus.example.com", apiKey });
  * const res = await proteus.conversion.convert({ document: {...}, outputFormat: OutputFormat.PDF });
+ * const { file } = await proteus.pdf.mergePdfs({ inputs: [pdfInput(a), pdfInput(b, "1-3")] });
  * ```
  *
  * The default transport is the Connect protocol over fetch, which browsers
@@ -21,8 +22,10 @@ import {
   type Transport,
 } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import type { MessageInitShape } from "@bufbuild/protobuf";
 
 import { ConversionService } from "./gen/proteus/v1/conversion_pb.js";
+import { PdfService, type PdfInputSchema } from "./gen/proteus/v1/pdf_pb.js";
 import {
   TemplateDataErrorSchema,
   TemplateService,
@@ -31,6 +34,8 @@ import {
 
 export * from "./gen/proteus/v1/conversion_pb.js";
 export * from "./gen/proteus/v1/template_pb.js";
+export * from "./gen/proteus/v1/pdf_pb.js";
+export * from "./gen/proteus/v1/protection_pb.js";
 export { Code, ConnectError } from "@connectrpc/connect";
 
 export interface ProteusOptions {
@@ -51,6 +56,8 @@ export interface ProteusOptions {
 export interface Proteus {
   conversion: Client<typeof ConversionService>;
   templates: Client<typeof TemplateService>;
+  /** Merges and splits existing PDF files. */
+  pdf: Client<typeof PdfService>;
   transport: Transport;
 }
 
@@ -64,7 +71,7 @@ export function apiKeyInterceptor(apiKey: string): Interceptor {
   };
 }
 
-/** Creates clients for both services over one transport. */
+/** Creates clients for every service over one transport. */
 export function createProteus(options: ProteusOptions): Proteus {
   const interceptors = [apiKeyInterceptor(options.apiKey ?? ""), ...(options.interceptors ?? [])];
   const transport =
@@ -78,6 +85,7 @@ export function createProteus(options: ProteusOptions): Proteus {
   return {
     conversion: createClient(ConversionService, transport),
     templates: createClient(TemplateService, transport),
+    pdf: createClient(PdfService, transport),
     transport,
   };
 }
@@ -104,4 +112,13 @@ export function problemsByPath(problems: DataProblem[]): Map<string, string[]> {
     out.set(p.path, list);
   }
   return out;
+}
+
+/**
+ * A PdfInput for MergePdfs or SplitPdf from file bytes, with an optional page
+ * selection ("1-3,5,8-", "3-1", "last"; empty means every page) and the
+ * password of an encrypted file.
+ */
+export function pdfInput(content: Uint8Array, pages = "", password = ""): MessageInitShape<typeof PdfInputSchema> {
+  return { source: { case: "content", value: content }, pages, password };
 }

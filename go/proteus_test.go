@@ -19,6 +19,7 @@ import (
 type fake struct {
 	proteusv1connect.UnimplementedConversionServiceHandler
 	proteusv1connect.UnimplementedTemplateServiceHandler
+	proteusv1connect.UnimplementedPdfServiceHandler
 	auth string
 }
 
@@ -40,12 +41,20 @@ func (f *fake) RenderTemplate(context.Context, *proteusv1.RenderTemplateRequest)
 	return nil, err.WithDetail(detail)
 }
 
+func (f *fake) MergePdfs(_ context.Context, req *proteusv1.MergePdfsRequest) (*proteusv1.MergePdfsResponse, error) {
+	return &proteusv1.MergePdfsResponse{
+		File:     &proteusv1.PdfFile{FileName: "merged.pdf", PageCount: int32(len(req.GetInputs())), PasswordProtected: true},
+		Password: "generated",
+	}, nil
+}
+
 func newServer(t *testing.T) (*fake, string) {
 	t.Helper()
 	f := &fake{}
 	server := connect.NewServer()
 	proteusv1connect.RegisterConversionServiceHandler(server, f)
 	proteusv1connect.RegisterTemplateServiceHandler(server, f)
+	proteusv1connect.RegisterPdfServiceHandler(server, f)
 	mux := http.NewServeMux()
 	connecthttp.Mount(mux, server)
 	srv := httptest.NewUnstartedServer(mux)
@@ -81,6 +90,14 @@ func TestClient(t *testing.T) {
 	}
 	if DataProblems(nil) != nil || DataProblems(connect.NewError(connect.CodeNotFound, "x")) != nil {
 		t.Fatal("problems from an error without detail")
+	}
+
+	merged, err := c.Pdf.MergePdfs(ctx, &proteusv1.MergePdfsRequest{
+		Inputs:     []*proteusv1.PdfInput{{Source: &proteusv1.PdfInput_Content{Content: []byte("%PDF-")}, Pages: "1-2"}},
+		Protection: &proteusv1.Protection{Generate: true},
+	})
+	if err != nil || merged.GetFile().GetPageCount() != 1 || merged.GetPassword() != "generated" {
+		t.Fatalf("MergePdfs = %v, %v", merged, err)
 	}
 
 	// No key sends no header; gRPC over h2c works too.
