@@ -5,11 +5,13 @@ import { Code, ConnectError, createRouterTransport } from "@connectrpc/connect";
 
 import {
   ConversionService,
+  PdfService,
   TemplateDataErrorSchema,
   TemplateService,
   apiKeyInterceptor,
   createProteus,
   dataProblems,
+  pdfInput,
   problemsByPath,
 } from "./index.js";
 
@@ -23,6 +25,12 @@ describe("createProteus", () => {
         listFormats(_req, ctx) {
           auth = ctx.requestHeader.get("Authorization");
           return { conversions: [{ mimeType: "application/pdf" }] };
+        },
+      });
+      service(PdfService, {
+        mergePdfs(req) {
+          const pages = req.inputs.map((i) => i.pages).join("|");
+          return { file: { fileName: "merged.pdf", pageCount: req.inputs.length, passwordProtected: true }, password: pages };
         },
       });
       service(TemplateService, {
@@ -48,6 +56,19 @@ describe("createProteus", () => {
     const res = await proteus.conversion.listFormats({});
     expect(res.conversions).toHaveLength(1);
     expect(proteus.templates).toBeDefined();
+  });
+
+  test("merges PDFs through the pdf client", async () => {
+    const proteus = createProteus({ baseUrl: "http://unused", transport });
+    const pdf = new TextEncoder().encode("%PDF-");
+    const res = await proteus.pdf.mergePdfs({
+      inputs: [pdfInput(pdf), pdfInput(pdf, "1-3", "secret")],
+      protection: { generate: true },
+    });
+    expect(res.file?.pageCount).toBe(2);
+    expect(res.file?.passwordProtected).toBe(true);
+    expect(res.password).toBe("|1-3");
+    expect(pdfInput(pdf, "2").source).toEqual({ case: "content", value: pdf });
   });
 
   test("decodes template data problems", async () => {

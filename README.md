@@ -34,13 +34,28 @@ try {
 }
 ```
 
+Merge and split existing PDFs with `proteus.pdf` (`pdfInput(bytes, pages?, password?)` builds an input):
+
+```ts
+import { pdfInput } from "@gsoultan/proteus-client";
+
+// Pages 1-3 of a, then all of b, protected with a password the server makes.
+const { file, password } = await proteus.pdf.mergePdfs({
+  inputs: [pdfInput(a, "1-3"), pdfInput(b)],
+  protection: { generate: true },
+});
+
+// One file per page of an encrypted PDF.
+const { parts } = await proteus.pdf.splitPdf({ input: pdfInput(c, "", "open-sesame"), mode: { case: "every", value: 1 } });
+```
+
 The default transport is the Connect protocol over `fetch`, which browsers and
 Node 18+ speak without extra packages; responses are JSON unless
 `useBinaryFormat: true`. Pass `transport` (for example from
 `@connectrpc/connect-node` with `createGrpcTransport`) to use something else;
 add `apiKeyInterceptor(key)` to its interceptors then. Everything in the
-generated code is re-exported: message types, enums, `ConversionService` and
-`TemplateService` descriptors and the `*Schema` values for `create()`.
+generated code is re-exported: message types, enums, `ConversionService`,
+`TemplateService` and `PdfService` descriptors and the `*Schema` values for `create()`.
 
 ## Go
 
@@ -67,8 +82,15 @@ if problems := proteus.DataProblems(err); problems != nil {
 `WithGRPCWeb()` switch protocols (gRPC needs an HTTP/2 client: TLS, or h2c
 with `http.Protocols.SetUnencryptedHTTP2`), `WithHTTPClient`,
 `WithTransportOptions` (compression, codecs) and `WithInterceptors` tune the
-rest. `c.Conversion` and `c.Templates` are the generated
-`proteusv1connect` clients.
+rest. `c.Conversion`, `c.Templates` and `c.Pdf` are the generated
+`proteusv1connect` clients:
+
+```go
+res, err := c.Pdf.SplitPdf(ctx, &proteusv1.SplitPdfRequest{
+    Input: &proteusv1.PdfInput{Source: &proteusv1.PdfInput_Content{Content: pdf}},
+    Mode:  &proteusv1.SplitPdfRequest_Ranges{Ranges: &proteusv1.PageRanges{Ranges: []string{"1-3", "4-"}}},
+})
+```
 
 ## Keeping up with the server
 
